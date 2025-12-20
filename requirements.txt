@@ -1,0 +1,36 @@
+# Core data science
+pandas
+numpy
+scikit-learn
+
+# Visualization
+matplotlib
+seaborn
+plotly
+
+# Jupyter
+jupyter
+notebook
+
+# Imbalanced data
+imbalanced-learn
+
+# Modeling
+xgboost
+lightgbm
+
+# Explainability
+shap
+
+# Utilities
+tqdm
+python-dotenv
+
+# Testing
+pytest
+pytest-cov
+
+# Linting
+flake8
+black
+isort
