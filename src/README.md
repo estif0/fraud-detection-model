@@ -16,11 +16,12 @@ This directory contains all the core Python modules for the fraud detection proj
   - `save_processed_data()`: Save processed data to CSV
   - `get_data_info()`: Get summary information about datasets
 
-- **`DataCleaner`** *(Coming in Step 1.2)*: Clean and validate data
-  - Handle missing values
-  - Remove duplicates
-  - Validate data types
-  - Generate cleaning reports
+- **`DataCleaner`**: Clean and validate data
+  - `check_missing_values()`: Identify missing data with summary statistics
+  - `handle_missing_values()`: Multiple strategies (drop, fill, mean, median, mode)
+  - `remove_duplicates()`: Remove duplicate rows with flexible options
+  - `validate_data_types()`: Validate and convert data types
+  - `generate_cleaning_report()`: Comprehensive cleaning summary
 
 - **`IPMapper`** *(Coming in Step 1.5)*: Map IP addresses to countries
   - Convert IP strings to integers
@@ -198,15 +199,15 @@ See `requirements.txt` for complete dependency list.
 
 ## Module Status
 
-| Module                   | Status     | Step | Description                  |
-| ------------------------ | ---------- | ---- | ---------------------------- |
-| `data_preprocessing.py`  | ✅ Complete | 1.1  | DataLoader class implemented |
-| `EDA_fraud.py`           | ⏳ Pending  | 1.3  | Fraud data EDA               |
-| `EDA_creditcard.py`      | ⏳ Pending  | 1.4  | Credit card EDA              |
-| `feature_engineering.py` | ⏳ Pending  | 1.6  | Feature creation             |
-| `model_training.py`      | ⏳ Pending  | 2.1  | Model training               |
-| `model_evaluation.py`    | ⏳ Pending  | 2.2  | Model evaluation             |
-| `shap_analysis.py`       | ⏳ Pending  | 3.1  | Explainability               |
+| Module                   | Status     | Step    | Description                          |
+| ------------------------ | ---------- | ------- | ------------------------------------ |
+| `data_preprocessing.py`  | ✅ Complete | 1.1-1.2 | DataLoader & DataCleaner implemented |
+| `EDA_fraud.py`           | ⏳ Pending  | 1.3     | Fraud data EDA                       |
+| `EDA_creditcard.py`      | ⏳ Pending  | 1.4     | Credit card EDA                      |
+| `feature_engineering.py` | ⏳ Pending  | 1.6     | Feature creation                     |
+| `model_training.py`      | ⏳ Pending  | 2.1     | Model training                       |
+| `model_evaluation.py`    | ⏳ Pending  | 2.2     | Model evaluation                     |
+| `shap_analysis.py`       | ⏳ Pending  | 3.1     | Explainability                       |
 
 ---
 
