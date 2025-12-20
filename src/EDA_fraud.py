@@ -687,6 +687,48 @@ class FraudDataEDA:
 
         self.report["categorical_analysis"] = results
         print(f"\n{'='*60}\n")
+
+        if save_plot:
+            n_features = min(4, len(features))
+            n_cols = 2
+            n_rows = (n_features + n_cols - 1) // n_cols
+
+            fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 5 * n_rows))
+            axes = axes.flatten() if n_features > 1 else [axes]
+
+            for idx, feature in enumerate(features[:n_features]):
+                ax = axes[idx]
+
+                # Get top categories by frequency
+                top_categories = self.data[feature].value_counts().head(10).index
+                data_subset = self.data[self.data[feature].isin(top_categories)]
+
+                fraud_counts = pd.crosstab(
+                    data_subset[feature], data_subset[self.target_column]
+                )
+                fraud_counts.plot(
+                    kind="bar", stacked=True, ax=ax, color=["#2ecc71", "#e74c3c"]
+                )
+                ax.set_title(f"{feature} vs Fraud Status", fontweight="bold")
+                ax.set_xlabel(feature)
+                ax.set_ylabel("Count")
+                ax.legend(["Legitimate", "Fraud"], loc="upper right")
+                ax.tick_params(axis="x", rotation=45)
+                ax.grid(axis="y", alpha=0.3)
+
+            # Hide unused subplots
+            for idx in range(n_features, len(axes)):
+                axes[idx].set_visible(False)
+
+            plt.tight_layout()
+            filename = "categorical_features_analysis.png"
+            filepath = self.output_dir / filename
+            plt.savefig(filepath, dpi=300, bbox_inches="tight")
+            plt.close()
+            print(f"\n✓ Saved categorical features analysis plot: {filepath}")
+            results["plot_saved"] = str(filepath)
+        self.report["categorical_analysis"] = results
+        print(f"\n{'='*60}\n")
         return results
 
     def generate_eda_report(self) -> Dict[str, Any]:
