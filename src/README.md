@@ -84,30 +84,34 @@ report = eda.generate_eda_report()
 
 ---
 
-### 3. `EDA_creditcard.py` *(Coming in Step 1.4)*
+### 3. `EDA_creditcard.py`
 
 **Purpose**: Exploratory data analysis for credit card transaction data.
 
 **Classes**:
 - **`CreditCardEDA`**: Comprehensive EDA for credit card dataset
-  - PCA features analysis
-  - Transaction amount patterns
-  - Temporal analysis
-  - Correlation analysis
+  - `pca_features_analysis()`: Analyze V1-V28 distributions
+  - `amount_analysis()`: Transaction amount patterns
+  - `time_analysis()`: Temporal patterns from `Time`
+  - `correlation_analysis()`: Feature correlations
+  - `analyze_class_imbalance()`: Fraud vs legitimate ratio
+  - `generate_eda_report()`: Summary insights
 
 ---
 
-### 4. `feature_engineering.py` *(Coming in Step 1.6)*
+### 4. `feature_engineering.py`
 
 **Purpose**: Create and transform features for modeling.
 
 **Classes**:
 - **`FeatureEngineer`**: Feature creation and transformation
-  - Temporal features (hour_of_day, day_of_week)
-  - Time since signup calculation
-  - Transaction velocity and frequency
-  - Categorical encoding
-  - Numerical feature scaling
+  - `create_time_features()`: hour_of_day, day_of_week
+  - `calculate_time_since_signup()`: minutes since signup
+  - `calculate_transaction_velocity()`: rolling counts per user
+  - `calculate_transaction_frequency()`: transactions per user
+  - `create_aggregated_features()`: user-level statistics
+  - `encode_categorical_features()`: One-hot encoding
+  - `scale_numerical_features()`: Standard/MinMax scaling
 
 ---
 
@@ -222,8 +226,8 @@ See `requirements.txt` for complete dependency list.
 | ------------------------ | ---------- | ------- | ------------------------------------ |
 | `data_preprocessing.py`  | ✅ Complete | 1.1-1.2 | DataLoader & DataCleaner implemented |
 | `EDA_fraud.py`           | ✅ Complete | 1.3     | FraudDataEDA with 6 analysis methods |
-| `EDA_creditcard.py`      | ⏳ Pending  | 1.4     | Credit card EDA                      |
-| `feature_engineering.py` | ⏳ Pending  | 1.6     | Feature creation                     |
+| `EDA_creditcard.py`      | ✅ Complete | 1.4     | Credit card EDA                      |
+| `feature_engineering.py` | ✅ Complete | 1.6     | Feature creation                     |
 | `model_training.py`      | ⏳ Pending  | 2.1     | Model training                       |
 | `model_evaluation.py`    | ⏳ Pending  | 2.2     | Model evaluation                     |
 | `shap_analysis.py`       | ⏳ Pending  | 3.1     | Explainability                       |
