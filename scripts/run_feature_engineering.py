@@ -12,12 +12,19 @@ Usage example:
         --categoricals browser source sex
 """
 
+import sys
+import os
 import argparse
 import logging
 from pathlib import Path
 from typing import List
 
 import pandas as pd
+
+# Add project root to Python path for src imports
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from src.feature_engineering import FeatureEngineer
 
