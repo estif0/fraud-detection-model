@@ -666,3 +666,293 @@ class DataCleaner:
             >>> cleaned_data = cleaner.get_cleaned_data()
         """
         return self.data.copy()
+
+
+class IPMapper:
+    """Map IP addresses to countries via range-based lookup.
+
+    The mapping file contains inclusive ranges as integers:
+    `lower_bound_ip_address`, `upper_bound_ip_address`, and `country`.
+    This class converts IPs to integers when necessary and performs a
+    range lookup to assign country labels to the fraud dataset.
+
+    Attributes:
+        ip_ranges (pd.DataFrame): Mapping dataframe with lower/upper bounds and country.
+        prepared (bool): Whether internal structures have been prepared.
+
+    Example:
+        >>> mapper = IPMapper(ip_mapping_df)
+        >>> ip_int = mapper.ip_to_integer('8.8.8.8')
+        >>> merged = mapper.map_ip_to_country(fraud_df, ip_column='ip_address')
+        >>> country_stats = mapper.analyze_fraud_by_country(merged, target_column='class')
+    """
+
+    def __init__(self, ip_mapping: pd.DataFrame) -> None:
+        """Initialize with an IP mapping dataframe.
+
+        Args:
+            ip_mapping (pd.DataFrame): DataFrame with columns
+                `lower_bound_ip_address`, `upper_bound_ip_address`, `country`.
+        """
+        required_cols = {"lower_bound_ip_address", "upper_bound_ip_address", "country"}
+        if not required_cols.issubset(set(ip_mapping.columns)):
+            raise ValueError(
+                "IP mapping must contain lower_bound_ip_address, upper_bound_ip_address, country"
+            )
+        self.ip_ranges = ip_mapping.copy().sort_values("lower_bound_ip_address")
+        self.prepared = True
+
+    @staticmethod
+    def ip_to_integer(ip: Any) -> int:
+        """Convert an IP representation to integer.
+
+        Supports dotted IPv4 strings (e.g., '1.2.3.4') and numeric strings/values.
+
+        Args:
+            ip (Any): IP address value.
+
+        Returns:
+            int: Integer representation of IP.
+
+        Raises:
+            ValueError: If the IP cannot be parsed.
+        """
+        if ip is None or (isinstance(ip, float) and np.isnan(ip)):
+            raise ValueError("IP value is None/NaN")
+
+        # Numeric string or number
+        try:
+            # Some datasets store IP as decimal integer already
+            if isinstance(ip, (int, np.integer)):
+                return int(ip)
+            if isinstance(ip, (float, np.floating)):
+                return int(ip)
+            ip_str = str(ip).strip()
+            if ip_str.isdigit():
+                return int(ip_str)
+        except Exception:
+            pass
+
+        # Dotted IPv4 string
+        parts = str(ip).split(".")
+        if len(parts) == 4:
+            try:
+                octets = [int(p) for p in parts]
+                for o in octets:
+                    if o < 0 or o > 255:
+                        raise ValueError("Invalid IPv4 octet range")
+                return (
+                    (octets[0] << 24) + (octets[1] << 16) + (octets[2] << 8) + octets[3]
+                )
+            except Exception as e:
+                raise ValueError(f"Invalid dotted IPv4: {ip}") from e
+
+        raise ValueError(f"Unsupported IP format: {ip}")
+
+    def map_ip_to_country(
+        self, df: pd.DataFrame, ip_column: str = "ip_address"
+    ) -> pd.DataFrame:
+        """Map IPs in a dataframe to countries using range lookup.
+
+        A straightforward approach using row-wise lookup is provided for clarity.
+        For very large datasets, consider interval indexing or specialized libraries.
+
+        Args:
+            df (pd.DataFrame): Fraud dataset containing an IP column.
+            ip_column (str): Column name containing the IP address.
+
+        Returns:
+            pd.DataFrame: Copy of input df with an added `country` column.
+        """
+        if ip_column not in df.columns:
+            raise ValueError(f"Column '{ip_column}' not found in dataframe")
+
+        out = df.copy()
+
+        # Ensure IPs are integers; gracefully handle parsing failures
+        def _lookup_country(ip_val: Any) -> str:
+            try:
+                ip_int = self.ip_to_integer(ip_val)
+            except Exception:
+                return "Unknown"
+
+            # Find matching range via boolean mask (clear, not the most efficient)
+            match = self.ip_ranges[
+                (self.ip_ranges["lower_bound_ip_address"] <= ip_int)
+                & (self.ip_ranges["upper_bound_ip_address"] >= ip_int)
+            ]
+            if len(match) == 0:
+                return "Unknown"
+            # If multiple matches, take the first
+            return (
+                str(match.iloc[0]["country"])
+                if "country" in match.columns
+                else "Unknown"
+            )
+
+        out["country"] = out[ip_column].apply(_lookup_country)
+        return out
+
+    @staticmethod
+    def analyze_fraud_by_country(
+        df: pd.DataFrame, target_column: str = "class"
+    ) -> pd.DataFrame:
+        """Compute country-wise fraud statistics.
+
+        Args:
+            df (pd.DataFrame): Dataset with `country` and target columns.
+            target_column (str): Target column name, defaults to 'class'.
+
+        Returns:
+            pd.DataFrame: Aggregated stats with columns `fraud_count`, `total`, `fraud_rate`.
+        """
+        if "country" not in df.columns:
+            raise ValueError("Dataframe must contain 'country' column for analysis")
+        agg = (
+            df.groupby("country")[target_column]
+            .agg(["sum", "count", "mean"])
+            .rename(
+                columns={"sum": "fraud_count", "count": "total", "mean": "fraud_rate"}
+            )
+            .sort_values("fraud_rate", ascending=False)
+        )
+        return agg
+
+
+class ImbalanceHandler:
+    """Handle class imbalance using SMOTE, undersampling, and combined strategies.
+
+    All methods operate on feature matrix `X` and target vector `y` and return
+    resampled datasets. Apply only to training data, not test sets.
+
+    Example:
+        >>> handler = ImbalanceHandler()
+        >>> X_res, y_res = handler.apply_smote(X_train, y_train)
+    """
+
+    def __init__(self) -> None:
+        """Initialize the handler."""
+        # Lazy import to avoid hard dependency during non-imbalanced workflows
+        from imblearn.over_sampling import SMOTE  # noqa: F401
+        from imblearn.under_sampling import RandomUnderSampler  # noqa: F401
+        from imblearn.combine import SMOTEENN  # noqa: F401
+
+    @staticmethod
+    def analyze_imbalance(y: pd.Series) -> Dict[str, Any]:
+        """Calculate class ratios and basic stats.
+
+        Args:
+            y (pd.Series): Target vector.
+
+        Returns:
+            dict: Counts, percentages, and imbalance ratio.
+        """
+        counts = y.value_counts()
+        legit = int(counts.get(0, 0))
+        fraud = int(counts.get(1, 0))
+        total = legit + fraud
+        fraud_pct = (fraud / total * 100) if total else 0.0
+        legit_pct = (legit / total * 100) if total else 0.0
+        ratio = (legit / fraud) if fraud else float("inf")
+        return {
+            "fraud_count": fraud,
+            "legitimate_count": legit,
+            "fraud_percentage": fraud_pct,
+            "legitimate_percentage": legit_pct,
+            "imbalance_ratio": ratio,
+            "total": total,
+        }
+
+    @staticmethod
+    def apply_smote(
+        X: pd.DataFrame, y: pd.Series, random_state: int = 42
+    ) -> Tuple[pd.DataFrame, pd.Series]:
+        """Apply SMOTE oversampling to minority class.
+
+        Args:
+            X (pd.DataFrame): Feature matrix.
+            y (pd.Series): Target vector.
+            random_state (int): Random seed.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.Series]: Resampled X and y.
+        """
+        from imblearn.over_sampling import SMOTE
+
+        # Use only numeric features for resampling
+        X_num = X.select_dtypes(include=[np.number])
+        if X_num.empty:
+            raise ValueError("No numeric features available for SMOTE resampling")
+        # Adjust k_neighbors to available minority samples
+        minority_count = int((y == 1).sum())
+        k_neighbors = max(1, min(5, minority_count - 1))
+        sm = SMOTE(random_state=random_state, k_neighbors=k_neighbors)
+        X_res, y_res = sm.fit_resample(X_num, y)
+        return X_res, y_res
+
+    @staticmethod
+    def apply_undersampling(
+        X: pd.DataFrame, y: pd.Series, random_state: int = 42
+    ) -> Tuple[pd.DataFrame, pd.Series]:
+        """Apply random undersampling to majority class.
+
+        Args:
+            X (pd.DataFrame): Feature matrix.
+            y (pd.Series): Target vector.
+            random_state (int): Random seed.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.Series]: Resampled X and y.
+        """
+        from imblearn.under_sampling import RandomUnderSampler
+
+        X_num = X.select_dtypes(include=[np.number])
+        if X_num.empty:
+            raise ValueError("No numeric features available for undersampling")
+        rus = RandomUnderSampler(random_state=random_state)
+        X_res, y_res = rus.fit_resample(X_num, y)
+        return X_res, y_res
+
+    @staticmethod
+    def apply_combined_sampling(
+        X: pd.DataFrame, y: pd.Series, random_state: int = 42
+    ) -> Tuple[pd.DataFrame, pd.Series]:
+        """Apply SMOTE + Edited Nearest Neighbors (SMOTEENN)."""
+        from imblearn.combine import SMOTEENN
+        from imblearn.over_sampling import SMOTE
+
+        X_num = X.select_dtypes(include=[np.number])
+        if X_num.empty:
+            raise ValueError("No numeric features available for combined sampling")
+        minority_count = int((y == 1).sum())
+        k_neighbors = max(1, min(5, minority_count - 1))
+        smoteenn = SMOTEENN(
+            random_state=random_state,
+            smote=SMOTE(random_state=random_state, k_neighbors=k_neighbors),
+        )
+        X_res, y_res = smoteenn.fit_resample(X_num, y)
+        return X_res, y_res
+
+    @staticmethod
+    def compare_strategies(X: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
+        """Compare sizes after different resampling strategies.
+
+        Returns a small table summarizing resulting dataset sizes.
+        """
+        strategies = {}
+        strategies["original"] = {"X": len(X), "y": int(y.sum()), "total": len(y)}
+        X_sm, y_sm = ImbalanceHandler.apply_smote(X, y)
+        strategies["smote"] = {"X": len(X_sm), "y": int(y_sm.sum()), "total": len(y_sm)}
+        X_ru, y_ru = ImbalanceHandler.apply_undersampling(X, y)
+        strategies["undersample"] = {
+            "X": len(X_ru),
+            "y": int(y_ru.sum()),
+            "total": len(y_ru),
+        }
+        X_se, y_se = ImbalanceHandler.apply_combined_sampling(X, y)
+        strategies["smoteenn"] = {
+            "X": len(X_se),
+            "y": int(y_se.sum()),
+            "total": len(y_se),
+        }
+        return pd.DataFrame(strategies).T
