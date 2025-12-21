@@ -10,7 +10,7 @@ import numpy as np
 from pathlib import Path
 import tempfile
 import shutil
-from src.data_preprocessing import DataLoader, DataCleaner
+from src.data_preprocessing import DataLoader, DataCleaner, IPMapper, ImbalanceHandler
 
 
 @pytest.fixture
@@ -592,3 +592,65 @@ class TestDataCleanerIntegration:
         assert len(cleaned) < len(data)  # Duplicates removed
         assert cleaned["age"].dtype in [np.int64, np.int32]
         assert len(report["cleaning_operations"]) > 0
+
+
+class TestIPMapper:
+    """Tests for IP to country mapping utilities."""
+
+    def test_ip_to_integer_dotted_and_numeric(self):
+        mapping = pd.DataFrame(
+            {
+                "lower_bound_ip_address": [0],
+                "upper_bound_ip_address": [4294967295],
+                "country": ["Global"],
+            }
+        )
+        mapper = IPMapper(mapping)
+        # Dotted IPv4
+        assert isinstance(mapper.ip_to_integer("1.2.3.4"), int)
+        # Numeric string
+        assert isinstance(mapper.ip_to_integer("123456"), int)
+        # Integer
+        assert isinstance(mapper.ip_to_integer(123456), int)
+
+    def test_map_ip_to_country_basic(self, sample_fraud_data, sample_ip_mapping):
+        mapper = IPMapper(sample_ip_mapping)
+        # Ensure at least some IPs fall in known ranges for this synthetic sample
+        df = sample_fraud_data.copy()
+        # Force IPs into known range
+        df.loc[:2, "ip_address"] = [100000001, 250000000, 350000000]
+        merged = mapper.map_ip_to_country(df, ip_column="ip_address")
+        assert "country" in merged.columns
+        assert merged.loc[0, "country"] in {"USA", "UK", "Germany", "Unknown"}
+        stats = IPMapper.analyze_fraud_by_country(merged, target_column="class")
+        assert {"fraud_count", "total", "fraud_rate"}.issubset(set(stats.columns))
+
+
+class TestImbalanceHandler:
+    """Tests for class imbalance handling strategies."""
+
+    def test_analyze_imbalance(self, sample_fraud_data):
+        handler = ImbalanceHandler()
+        y = sample_fraud_data["class"]
+        info = handler.analyze_imbalance(y)
+        assert "fraud_count" in info and "legitimate_count" in info
+
+    def test_smote_and_undersampling(self, sample_fraud_data):
+        handler = ImbalanceHandler()
+        X = sample_fraud_data.drop(columns=["class"])
+        y = sample_fraud_data["class"]
+        X_sm, y_sm = handler.apply_smote(X, y)
+        assert len(X_sm) == len(y_sm)
+        X_ru, y_ru = handler.apply_undersampling(X, y)
+        assert len(X_ru) == len(y_ru)
+
+    def test_combined_and_compare(self, sample_fraud_data):
+        handler = ImbalanceHandler()
+        X = sample_fraud_data.drop(columns=["class"])
+        y = sample_fraud_data["class"]
+        X_se, y_se = handler.apply_combined_sampling(X, y)
+        assert len(X_se) == len(y_se)
+        summary = handler.compare_strategies(X, y)
+        assert {"original", "smote", "undersample", "smoteenn"}.issubset(
+            set(summary.index)
+        )
