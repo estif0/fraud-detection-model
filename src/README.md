@@ -101,42 +101,121 @@ report = eda.generate_eda_report()
 
 ### 4. `feature_engineering.py`
 
-**Purpose**: Create and transform features for modeling.
+**Purpose**: Feature creation, transformation, encoding, and scaling for fraud detection.
 
 **Classes**:
-- **`FeatureEngineer`**: Feature creation and transformation
-  - `create_time_features()`: hour_of_day, day_of_week
-  - `calculate_time_since_signup()`: minutes since signup
-  - `calculate_transaction_velocity()`: rolling counts per user
-  - `calculate_transaction_frequency()`: transactions per user
-  - `create_aggregated_features()`: user-level statistics
-  - `encode_categorical_features()`: One-hot encoding
-  - `scale_numerical_features()`: Standard/MinMax scaling
+- **`FeatureEngineer`**: Comprehensive feature engineering
+  - `create_time_features()`: Extract hour_of_day, day_of_week from timestamps
+  - `calculate_time_since_signup()`: Duration between signup and purchase
+  - `calculate_transaction_velocity()`: Transactions per user in time windows
+  - `calculate_transaction_frequency()`: User activity metrics
+  - `create_aggregated_features()`: User-level statistics (mean, std, count)
+  - `encode_categorical_features()`: One-hot encoding for categorical variables
+  - `scale_numerical_features()`: StandardScaler or MinMaxScaler
+
+**Usage Example**:
+```python
+from src.feature_engineering import FeatureEngineer
+
+# Initialize engineer
+fe = FeatureEngineer()
+
+# Create temporal features
+df_time = fe.create_time_features(df, timestamp_col='purchase_time')
+
+# Scale features
+df_scaled, scaler = fe.scale_numerical_features(df, method='standard')
+```
 
 ---
 
-### 5. `model_training.py` *(Coming in Step 2.1)*
+### 5. `model_training.py`
 
-**Purpose**: Train machine learning models for fraud detection.
+**Purpose**: Model training, hyperparameter tuning, and cross-validation for fraud detection.
 
 **Classes**:
-- **`ModelTrainer`**: Data preparation and splitting
-- **`BaselineModel`**: Logistic regression baseline
-- **`EnsembleModel`**: Random Forest, XGBoost, LightGBM
-- **`CrossValidator`**: Stratified K-fold cross-validation
+- **`DataSplitter`**: Stratified train-test splitting
+  - `stratified_split()`: Split preserving class distribution
+  - `validate_split()`: Verify split quality
+
+- **`BaselineModel`**: Logistic Regression baseline
+  - `train()`: Train LR with balanced class weights
+  - `predict()`: Generate predictions
+  - `predict_proba()`: Generate probabilities
+  - `save_model()` / `load_model()`: Model persistence
+
+- **`EnsembleModel`**: Ensemble model training
+  - Supports Random Forest, XGBoost, and LightGBM
+  - `train()`: Train with custom hyperparameters
+  - `hyperparameter_tuning()`: GridSearchCV or RandomizedSearchCV
+  - `predict()` / `predict_proba()`: Predictions
+  - `save_model()` / `load_model()`: Model persistence
+
+- **`CrossValidator`**: K-fold cross-validation
+  - `cross_validate_model()`: Stratified k-fold CV with multiple metrics
+  - Reports mean and standard deviation for each metric
+
+**Usage Example**:
+```python
+from src.model_training import DataSplitter, BaselineModel, EnsembleModel, CrossValidator
+
+# Split data
+splitter = DataSplitter(test_size=0.2)
+X_train, X_test, y_train, y_test = splitter.stratified_split(X, y)
+
+# Train baseline
+baseline = BaselineModel()
+lr_model = baseline.train(X_train, y_train)
+
+# Train ensemble
+xgb_trainer = EnsembleModel(model_type='xgb')
+xgb_model = xgb_trainer.train(X_train, y_train, n_estimators=100)
+
+# Cross-validate
+cv = CrossValidator(n_splits=5)
+scoring = {'f1': f1_score, 'precision': precision_score}
+cv_results = cv.cross_validate_model(xgb_model, X_train, y_train, scoring)
+```
 
 ---
 
-### 6. `model_evaluation.py` *(Coming in Step 2.2)*
+### 6. `model_evaluation.py`
 
-**Purpose**: Evaluate model performance with appropriate metrics.
+**Purpose**: Comprehensive model evaluation, comparison, and selection for fraud detection.
 
 **Classes**:
-- **`ModelEvaluator`**: Comprehensive model evaluation
-  - AUC-PR, F1-Score, Confusion Matrix
-  - ROC and PR curves
-  - Classification reports
-- **`ModelComparator`**: Compare multiple models
+- **`ModelEvaluator`**: Single model evaluation
+  - `evaluate_model()`: Calculate all metrics (accuracy, precision, recall, F1, ROC-AUC, PR-AUC)
+  - `print_evaluation_report()`: Formatted report
+  - `plot_confusion_matrix()`: Heatmap visualization
+  - `plot_roc_curve()`: ROC curve with AUC
+  - `plot_precision_recall_curve()`: PR curve (crucial for imbalanced data)
+  - `generate_classification_report()`: sklearn classification report
+
+- **`ModelComparator`**: Multi-model comparison
+  - `add_model_results()`: Add model evaluation results
+  - `create_comparison_table()`: DataFrame comparing all models
+  - `plot_model_comparison()`: Bar chart comparing metrics
+  - `select_best_model()`: Select best based on primary/secondary metrics
+  - `generate_model_selection_justification()`: Narrative justification
+
+**Usage Example**:
+```python
+from src.model_evaluation import ModelEvaluator, ModelComparator
+
+# Evaluate single model
+evaluator = ModelEvaluator(model_name="XGBoost")
+results = evaluator.evaluate_model(y_test, y_pred, y_pred_proba)
+evaluator.print_evaluation_report()
+evaluator.plot_confusion_matrix(y_test, y_pred, save_path='reports/images/cm.png')
+
+# Compare models
+comparator = ModelComparator()
+comparator.add_model_results('LR', lr_results)
+comparator.add_model_results('XGBoost', xgb_results)
+comparator.print_comparison_report()
+best_model, best_results = comparator.select_best_model(primary_metric='f1_score')
+```
 
 ---
 
