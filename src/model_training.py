@@ -336,25 +336,30 @@ class EnsembleModel:
             n_estimators (int): Number of boosting rounds.
             max_depth (int): Maximum tree depth.
             learning_rate (float): Learning rate (eta).
-            scale_pos_weight (float): Weight for positive class (handles imbalance).
+            scale_pos_weight (float): Weight for positive class.
+                                     **IMPORTANT**: Do NOT calculate automatically
+                                     when using SMOTE-balanced data. Only provide
+                                     explicitly if training on imbalanced data.
 
         Returns:
             Trained XGBClassifier.
         """
-        # Calculate scale_pos_weight if not provided (for imbalanced data)
-        if scale_pos_weight is None:
-            scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
+        # DO NOT auto-calculate scale_pos_weight when using SMOTE
+        # Let it default to 1 for balanced data
+        model_params = {
+            "n_estimators": n_estimators,
+            "max_depth": max_depth,
+            "learning_rate": learning_rate,
+            "random_state": self.random_state,
+            "n_jobs": -1,
+            "eval_metric": "logloss",
+        }
 
-        model = xgb.XGBClassifier(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            learning_rate=learning_rate,
-            scale_pos_weight=scale_pos_weight,
-            random_state=self.random_state,
-            n_jobs=-1,
-            eval_metric="logloss",
-        )
+        # Only add scale_pos_weight if explicitly provided
+        if scale_pos_weight is not None:
+            model_params["scale_pos_weight"] = scale_pos_weight
 
+        model = xgb.XGBClassifier(**model_params)
         model.fit(X_train, y_train)
         return model
 
@@ -431,10 +436,9 @@ class EnsembleModel:
                 random_state=self.random_state, class_weight="balanced", n_jobs=-1
             )
         elif self.model_type == "xgb":
-            scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
+            # DO NOT use scale_pos_weight for SMOTE-balanced data
             base_estimator = xgb.XGBClassifier(
                 random_state=self.random_state,
-                scale_pos_weight=scale_pos_weight,
                 n_jobs=-1,
                 eval_metric="logloss",
             )
@@ -514,6 +518,32 @@ class EnsembleModel:
         if self.model is None:
             raise ValueError("Model has not been trained yet. Call train() first.")
         return self.model.predict(X)
+
+    def predict_with_threshold(
+        self, X: pd.DataFrame, threshold: float = 0.5
+    ) -> np.ndarray:
+        """Generate predictions with custom probability threshold.
+
+        This is useful for imbalanced datasets where you want to adjust
+        the trade-off between precision and recall.
+
+        Args:
+            X (pd.DataFrame): Features to predict.
+            threshold (float): Probability threshold for positive class (default: 0.5).
+                             Lower threshold = more fraud predictions (higher recall, lower precision)
+                             Higher threshold = fewer fraud predictions (lower recall, higher precision)
+
+        Returns:
+            Array of predicted class labels.
+
+        Example:
+            >>> # More conservative (fewer false positives)
+            >>> y_pred = model.predict_with_threshold(X_test, threshold=0.7)
+        """
+        if self.model is None:
+            raise ValueError("Model has not been trained yet. Call train() first.")
+        y_proba = self.predict_proba(X)[:, 1]
+        return (y_proba >= threshold).astype(int)
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         """Generate probability predictions.
