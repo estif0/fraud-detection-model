@@ -99,6 +99,108 @@ report = eda.generate_eda_report()
 
 ---
 
+### 5. `model_training.py` ⭐ **NEW**
+
+**Purpose**: Model training, hyperparameter tuning, and cross-validation.
+
+**Classes**:
+- **`DataSplitter`**: Stratified train-test splitting
+  - `stratified_split()`: Split preserving class distribution
+  - `validate_split()`: Verify stratification worked correctly
+
+- **`BaselineModel`**: Logistic Regression baseline
+  - `train()`: Train with balanced class weights
+  - `predict()`: Generate predictions
+  - `predict_proba()`: Probability predictions
+  - `save_model()` / `load_model()`: Model persistence
+
+- **`EnsembleModel`**: Ensemble models (RF, XGBoost, LightGBM)
+  - `train()`: Train ensemble with custom parameters
+  - `hyperparameter_tuning()`: Grid/Random search with CV
+  - `predict_with_threshold()`: Custom probability threshold
+  - `predict()` / `predict_proba()`: Standard predictions
+  - `save_model()` / `load_model()`: Model persistence with metadata
+
+- **`CrossValidator`**: K-fold stratified cross-validation
+  - `cross_validate_model()`: Multi-metric CV with mean±std
+
+**Usage Example**:
+```python
+from src.model_training import DataSplitter, BaselineModel, EnsembleModel, CrossValidator
+
+# Split data
+splitter = DataSplitter(test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = splitter.stratified_split(X, y)
+
+# Train baseline
+baseline = BaselineModel()
+lr_model = baseline.train(X_train, y_train)
+y_pred = baseline.predict(X_test)
+
+# Train ensemble
+xgb_trainer = EnsembleModel(model_type='xgb', random_state=42)
+xgb_model = xgb_trainer.train(X_train, y_train, n_estimators=100, max_depth=6)
+
+# Hyperparameter tuning
+param_grid = {'n_estimators': [100, 200], 'max_depth': [5, 7, 9]}
+tuned_model = xgb_trainer.hyperparameter_tuning(X_train, y_train, param_grid)
+
+# Cross-validation
+cv = CrossValidator(n_splits=5)
+scoring = {'f1': f1_score, 'precision': precision_score}
+cv_results = cv.cross_validate_model(xgb_model, X_train, y_train, scoring)
+```
+
+---
+
+### 6. `model_evaluation.py` ⭐ **NEW**
+
+**Purpose**: Model evaluation, comparison, and selection.
+
+**Classes**:
+- **`ModelEvaluator`**: Comprehensive model evaluation
+  - `evaluate_model()`: Calculate all metrics (accuracy, precision, recall, F1, ROC-AUC, PR-AUC)
+  - `print_evaluation_report()`: Formatted metric display
+  - `plot_confusion_matrix()`: Heatmap visualization
+  - `plot_roc_curve()`: ROC curve with AUC
+  - `plot_precision_recall_curve()`: PR curve (better for imbalanced data)
+  - `find_optimal_threshold()`: Optimize decision threshold for F1/precision/recall
+  - `compare_thresholds()`: Visual comparison of different thresholds
+
+- **`ModelComparator`**: Multi-model comparison
+  - `add_model_results()`: Register model performance
+  - `create_comparison_table()`: DataFrame with all metrics
+  - `plot_model_comparison()`: Bar chart comparison
+  - `select_best_model()`: Automated selection based on metrics
+  - `generate_model_selection_justification()`: Document selection rationale
+  - `print_comparison_report()`: Formatted comparison output
+
+**Usage Example**:
+```python
+from src.model_evaluation import ModelEvaluator, ModelComparator
+
+# Evaluate single model
+evaluator = ModelEvaluator(model_name="XGBoost")
+results = evaluator.evaluate_model(y_test, y_pred, y_pred_proba)
+evaluator.print_evaluation_report()
+evaluator.plot_confusion_matrix(y_test, y_pred, save_path='reports/images/cm.png')
+
+# Find optimal threshold
+optimal_threshold, metrics = evaluator.find_optimal_threshold(y_test, y_pred_proba, metric='f1')
+
+# Compare multiple models
+comparator = ModelComparator()
+comparator.add_model_results('Logistic Regression', lr_results)
+comparator.add_model_results('XGBoost', xgb_results)
+comparator.add_model_results('LightGBM', lgb_results)
+
+comparison_df = comparator.create_comparison_table()
+comparator.plot_model_comparison(metrics=['f1_score', 'pr_auc'])
+best_model, best_results = comparator.select_best_model(primary_metric='f1_score')
+```
+
+---
+
 ### 4. `feature_engineering.py`
 
 **Purpose**: Feature creation, transformation, encoding, and scaling for fraud detection.
