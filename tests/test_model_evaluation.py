@@ -156,6 +156,31 @@ class TestModelEvaluator:
         assert "recall" in report
         assert "f1-score" in report
 
+    def test_find_optimal_threshold(self, sample_predictions):
+        """Test finding optimal threshold."""
+        y_true, _, y_pred_proba = sample_predictions
+        evaluator = ModelEvaluator(model_name="TestModel")
+
+        # Test with F1 metric
+        threshold, metrics = evaluator.find_optimal_threshold(
+            y_true, y_pred_proba, metric="f1"
+        )
+
+        assert isinstance(threshold, float)
+        assert 0.1 <= threshold <= 0.9
+        assert "precision" in metrics
+        assert "recall" in metrics
+        assert "f1" in metrics
+        assert "threshold" in metrics
+
+        # Test with different metrics
+        for metric in ["f2", "precision", "recall", "balanced"]:
+            threshold, metrics = evaluator.find_optimal_threshold(
+                y_true, y_pred_proba, metric=metric
+            )
+            assert isinstance(threshold, float)
+            assert 0.1 <= threshold <= 0.9
+
 
 class TestModelComparator:
     """Test cases for ModelComparator class."""
