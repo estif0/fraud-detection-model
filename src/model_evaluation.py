@@ -290,6 +290,92 @@ class ModelEvaluator:
 
         return fig
 
+    def find_optimal_threshold(
+        self,
+        y_true: pd.Series,
+        y_pred_proba: np.ndarray,
+        metric: str = "f1",
+        beta: float = 1.0,
+    ) -> Tuple[float, Dict[str, float]]:
+        """Find optimal probability threshold for classification.
+
+        For imbalanced fraud detection, the default 0.5 threshold often produces
+        too many false positives. This method finds the threshold that maximizes
+        a chosen metric.
+
+        Args:
+            y_true (pd.Series): True labels.
+            y_pred_proba (np.ndarray): Predicted probabilities for positive class.
+            metric (str): Metric to optimize ('f1', 'f2', 'precision', 'recall', 'balanced').
+                         'f1' = Equal weight to precision and recall
+                         'f2' = More weight to recall (catch more fraud, accept more FP)
+                         'precision' = Minimize false positives
+                         'recall' = Minimize false negatives
+                         'balanced' = Minimize difference between precision and recall
+            beta (float): Beta value for F-beta score (only used if metric='fbeta').
+
+        Returns:
+            Tuple of (optimal_threshold, metrics_at_threshold)
+
+        Example:
+            >>> evaluator = ModelEvaluator()
+            >>> threshold, metrics = evaluator.find_optimal_threshold(y_test, y_proba, metric='f1')
+            >>> print(f"Optimal threshold: {threshold:.3f}")
+            >>> print(f"F1-Score: {metrics['f1']:.4f}")
+        """
+        thresholds = np.linspace(0.1, 0.9, 81)  # Test 81 thresholds from 0.1 to 0.9
+        best_score = 0
+        best_threshold = 0.5
+        best_metrics = {}
+
+        for threshold in thresholds:
+            y_pred = (y_pred_proba >= threshold).astype(int)
+
+            precision = precision_score(y_true, y_pred, zero_division=0)
+            recall = recall_score(y_true, y_pred, zero_division=0)
+            f1 = f1_score(y_true, y_pred, zero_division=0)
+
+            # Calculate score based on chosen metric
+            if metric == "f1":
+                score = f1
+            elif metric == "f2":
+                # F2 score - weights recall higher than precision
+                score = (
+                    (5 * precision * recall) / (4 * precision + recall)
+                    if (precision + recall) > 0
+                    else 0
+                )
+            elif metric == "fbeta":
+                beta_sq = beta**2
+                score = (
+                    ((1 + beta_sq) * precision * recall)
+                    / (beta_sq * precision + recall)
+                    if (precision + recall) > 0
+                    else 0
+                )
+            elif metric == "precision":
+                score = precision
+            elif metric == "recall":
+                score = recall
+            elif metric == "balanced":
+                # Minimize difference between precision and recall
+                score = 1 - abs(precision - recall)
+            else:
+                raise ValueError(f"Unknown metric: {metric}")
+
+            if score > best_score:
+                best_score = score
+                best_threshold = threshold
+                best_metrics = {
+                    "threshold": threshold,
+                    "precision": precision,
+                    "recall": recall,
+                    "f1": f1,
+                    "score": score,
+                }
+
+        return best_threshold, best_metrics
+
     def generate_classification_report(
         self,
         y_true: pd.Series,
