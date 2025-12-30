@@ -34,6 +34,24 @@ Jupyter notebooks for exploratory data analysis, model development, and evaluati
    - Comprehensive model comparison and selection
    - Model persistence and versioning
 
+### Task 3: Model Explainability ✅
+
+4. **05-shap-explainability.ipynb** - Model interpretation and business insights
+   - Model and test data loading
+   - Built-in feature importance extraction and visualization
+   - SHAP value calculation (TreeExplainer)
+   - SHAP global analysis:
+     - Summary plots (beeswarm)
+     - Bar plots (mean absolute SHAP values)
+     - Dependence plots (feature interactions)
+   - SHAP local analysis:
+     - Force plots for True Positives, False Positives, False Negatives
+     - Waterfall plots showing feature contributions
+   - Comparison: Built-in vs SHAP importance rankings
+   - Top fraud driver identification
+   - Business recommendations generation
+   - Report export and visualization saving
+
 ## Running Notebooks
 
 ```bash

@@ -89,3 +89,143 @@ class TestFeatureEngineer:
         means = out[num_cols].mean().abs()
         # Allow small numerical tolerance
         assert (means < 1e-1).all()
+
+
+class TestCreditCardFeatureEngineering:
+    """Tests for credit card specific feature engineering."""
+
+    @pytest.fixture
+    def sample_creditcard_df(self):
+        """Create sample credit card data with V1-V28 features."""
+        np.random.seed(42)
+        n = 100
+
+        # Create PCA features V1-V28
+        pca_features = {f"V{i}": np.random.randn(n) for i in range(1, 29)}
+
+        df = pd.DataFrame(
+            {
+                "Time": np.random.randint(0, 172800, n),  # 0-48 hours in seconds
+                **pca_features,
+                "Amount": np.abs(np.random.randn(n) * 100),
+                "Class": np.random.choice([0, 1], size=n, p=[0.998, 0.002]),
+            }
+        )
+
+        return df
+
+    def test_engineer_creditcard_features_basic(self, sample_creditcard_df):
+        """Test basic credit card feature engineering."""
+        fe = FeatureEngineer()
+        result = fe.engineer_creditcard_features(sample_creditcard_df)
+
+        # Check shape: should have 30 features + Class
+        assert result.shape[1] == 31
+        assert result.shape[0] == sample_creditcard_df.shape[0]
+
+        # Check all V features present
+        for i in range(1, 29):
+            assert f"V{i}" in result.columns, f"V{i} missing"
+
+        # Check other features
+        assert "Amount" in result.columns
+        assert "hours" in result.columns
+        assert "Class" in result.columns
+
+        # Check Time was removed
+        assert "Time" not in result.columns
+
+    def test_engineer_creditcard_features_hours_conversion(self, sample_creditcard_df):
+        """Test Time to hours conversion."""
+        fe = FeatureEngineer()
+        result = fe.engineer_creditcard_features(sample_creditcard_df)
+
+        # Check hours is float
+        assert result["hours"].dtype == float
+
+        # Check hours are reasonable (0-48 for our test data)
+        assert result["hours"].min() >= 0
+        assert result["hours"].max() <= 48
+
+        # Verify conversion: hours = Time / 3600
+        expected_hours = sample_creditcard_df["Time"] / 3600
+        assert np.allclose(result["hours"], expected_hours, rtol=1e-5)
+
+    def test_engineer_creditcard_features_preserve_pca(self, sample_creditcard_df):
+        """Test that PCA features are preserved."""
+        fe = FeatureEngineer()
+        result = fe.engineer_creditcard_features(
+            sample_creditcard_df, preserve_pca=True
+        )
+
+        # Count V features
+        v_features = [c for c in result.columns if c.startswith("V")]
+        assert len(v_features) == 28
+
+        # Verify values are unchanged (not scaled)
+        for v_feat in v_features:
+            assert np.allclose(result[v_feat], sample_creditcard_df[v_feat], rtol=1e-5)
+
+    def test_engineer_creditcard_features_without_scaling(self, sample_creditcard_df):
+        """Test feature engineering without scaling."""
+        fe = FeatureEngineer()
+        result = fe.engineer_creditcard_features(
+            sample_creditcard_df, scale_features=False
+        )
+
+        # Values should not be standardized
+        # Check that means are not close to 0 (would indicate scaling)
+        non_zero_means = result[["Amount", "hours"]].mean().abs()
+        assert (non_zero_means > 0.1).any()
+
+    def test_engineer_creditcard_features_missing_time(self):
+        """Test error handling when Time column is missing."""
+        fe = FeatureEngineer()
+        df_no_time = pd.DataFrame(
+            {"V1": [1, 2, 3], "Amount": [10, 20, 30], "Class": [0, 1, 0]}
+        )
+
+        with pytest.raises(ValueError, match="'Time' column is required"):
+            fe.engineer_creditcard_features(df_no_time)
+
+    def test_engineer_creditcard_features_missing_pca(self):
+        """Test error handling when PCA features are missing."""
+        fe = FeatureEngineer()
+        df_no_pca = pd.DataFrame(
+            {"Time": [100, 200, 300], "Amount": [10, 20, 30], "Class": [0, 1, 0]}
+        )
+
+        with pytest.raises(ValueError, match="Missing PCA features"):
+            fe.engineer_creditcard_features(df_no_pca, preserve_pca=True)
+
+    def test_engineer_creditcard_features_without_class(self, sample_creditcard_df):
+        """Test with dataset that doesn't have Class column."""
+        fe = FeatureEngineer()
+        df_no_class = sample_creditcard_df.drop("Class", axis=1)
+
+        result = fe.engineer_creditcard_features(df_no_class)
+
+        # Should have 30 features (no Class)
+        assert result.shape[1] == 30
+        assert "Class" not in result.columns
+
+        # Should still have all V features, Amount, hours
+        v_count = sum(1 for c in result.columns if c.startswith("V"))
+        assert v_count == 28
+        assert "Amount" in result.columns
+        assert "hours" in result.columns
+
+    def test_engineer_creditcard_features_feature_count(self, sample_creditcard_df):
+        """Test that exact feature count is maintained."""
+        fe = FeatureEngineer()
+        result = fe.engineer_creditcard_features(sample_creditcard_df)
+
+        # Count features (excluding Class)
+        features = [c for c in result.columns if c != "Class"]
+        assert len(features) == 30, f"Expected 30 features, got {len(features)}"
+
+        # Break down: 28 V features + Amount + hours
+        v_features = [c for c in features if c.startswith("V")]
+        assert len(v_features) == 28
+        assert "Amount" in features
+        assert "hours" in features

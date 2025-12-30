@@ -99,6 +99,143 @@ report = eda.generate_eda_report()
 
 ---
 
+### 4. `model_training.py`
+
+**Purpose**: Model training, hyperparameter tuning, and cross-validation.
+
+**Classes**:
+- **`DataSplitter`**: Stratified train-test splitting
+  - `stratified_split()`: Split data preserving class distribution
+  - `validate_split()`: Verify stratification worked correctly
+
+- **`BaselineModel`**: Logistic Regression baseline
+  - `train()`: Train logistic regression with class balancing
+  - `predict()`: Generate predictions
+
+- **`EnsembleModel`**: Train tree-based ensemble models
+  - `train()`: Train RF/XGBoost/LightGBM
+  - `tune_hyperparameters()`: GridSearchCV optimization
+  - `find_optimal_threshold()`: Optimize classification threshold
+
+- **`CrossValidator`**: Stratified K-fold cross-validation
+  - `cross_validate_model()`: K-fold CV with multiple metrics
+
+**Usage Example**:
+```python
+from src.model_training import DataSplitter, EnsembleModel
+
+# Split data
+splitter = DataSplitter(test_size=0.2)
+X_train, X_test, y_train, y_test = splitter.stratified_split(X, y)
+
+# Train XGBoost
+xgb_trainer = EnsembleModel(model_type='xgb')
+model = xgb_trainer.train(X_train, y_train)
+
+# Tune hyperparameters
+tuned_model = xgb_trainer.tune_hyperparameters(
+    X_train, y_train, 
+    param_grid={'n_estimators': [100, 200], 'max_depth': [6, 10]}
+)
+```
+
+---
+
+### 5. `model_evaluation.py`
+
+**Purpose**: Model evaluation, comparison, and visualization.
+
+**Classes**:
+- **`ModelEvaluator`**: Evaluate single model performance
+  - `evaluate_model()`: Calculate all metrics (F1, PR-AUC, ROC-AUC, etc.)
+  - `plot_confusion_matrix()`: Visualize confusion matrix
+  - `plot_roc_curve()`: Plot ROC curve
+  - `plot_pr_curve()`: Plot Precision-Recall curve
+
+- **`ModelComparator`**: Compare multiple models
+  - `compare_models()`: Side-by-side comparison table
+  - `plot_comparison()`: Visualization of model performance
+
+**Usage Example**:
+```python
+from src.model_evaluation import ModelEvaluator, ModelComparator
+
+# Evaluate single model
+evaluator = ModelEvaluator(model_name="XGBoost")
+results = evaluator.evaluate_model(y_test, y_pred, y_pred_proba)
+evaluator.plot_confusion_matrix(y_test, y_pred, save_path='reports/images/')
+
+# Compare multiple models
+comparator = ModelComparator()
+comparison_df = comparator.compare_models(models_dict, X_test, y_test)
+```
+
+---
+
+### 6. `shap_analysis.py` ⭐ **Task 3**
+
+**Purpose**: Model explainability using SHAP (SHapley Additive exPlanations).
+
+**Classes**:
+- **`ExplainabilityAnalyzer`**: Extract and visualize feature importance
+  - `extract_feature_importance()`: Get built-in feature importance
+  - `plot_feature_importance()`: Visualize top N features
+  - `calculate_shap_values()`: Compute SHAP values for test set
+  - `plot_shap_summary()`: SHAP global importance summary plot
+  - `plot_shap_bar()`: SHAP bar chart ranking
+  - `explain_prediction()`: SHAP force plot for individual prediction
+  - `plot_shap_waterfall()`: Waterfall plot for single prediction
+  - `plot_dependence()`: SHAP dependence plot for feature interaction
+  - `compare_importance_methods()`: Compare built-in vs SHAP importance
+
+- **`RecommendationGenerator`**: Generate business recommendations
+  - `identify_top_drivers()`: Extract top fraud drivers from SHAP
+  - `generate_recommendations()`: Create actionable business recommendations
+  - `save_report()`: Export recommendations to markdown
+
+**Usage Example**:
+```python
+from src.shap_analysis import ExplainabilityAnalyzer, RecommendationGenerator
+import joblib
+
+# Load model and data
+model = joblib.load('models/best_model_xgboost_tuned.pkl')
+
+# Initialize analyzer
+analyzer = ExplainabilityAnalyzer(model, X_test, y_test)
+
+# Extract feature importance
+importance_df = analyzer.extract_feature_importance()
+analyzer.plot_feature_importance(top_n=10, save_path='reports/images/feature_importance.png')
+
+# Calculate SHAP values
+analyzer.calculate_shap_values(sample_size=1000)
+
+# Global analysis
+analyzer.plot_shap_summary(save_path='reports/images/shap_summary.png')
+analyzer.plot_shap_bar(top_n=15, save_path='reports/images/shap_bar.png')
+
+# Local analysis - explain specific predictions
+tp_idx = 100  # Index of true positive
+analyzer.explain_prediction(tp_idx, save_path='reports/images/shap_force_tp.html')
+analyzer.plot_shap_waterfall(tp_idx, save_path='reports/images/shap_waterfall_tp.png')
+
+# Feature interactions
+analyzer.plot_dependence('V14', save_path='reports/images/shap_dependence_V14.png')
+
+# Compare methods
+comparison_df = analyzer.compare_importance_methods()
+comparison_df.to_csv('reports/feature_importance_comparison.csv', index=False)
+
+# Generate business recommendations
+rec_gen = RecommendationGenerator()
+top_drivers = rec_gen.identify_top_drivers(importance_df, top_n=5)
+recommendations = rec_gen.generate_recommendations(top_drivers)
+rec_gen.save_report(recommendations, 'reports/BUSINESS_INSIGHTS_REPORT.md')
+```
+
+---
+
 ### 5. `model_training.py` ⭐ **NEW**
 
 **Purpose**: Model training, hyperparameter tuning, and cross-validation.

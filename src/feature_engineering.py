@@ -215,3 +215,101 @@ class FeatureEngineer:
         scaler = StandardScaler() if method == "standard" else MinMaxScaler()
         df[columns] = scaler.fit_transform(df[columns])
         return df, scaler
+
+    def engineer_creditcard_features(
+        self,
+        df: pd.DataFrame,
+        preserve_pca: bool = True,
+        scale_features: bool = False,
+    ) -> pd.DataFrame:
+        """Engineer features for credit card dataset while preserving V1-V28.
+
+        Critical: This method preserves all PCA features (V1-V28) which are
+        essential for fraud detection. Only transforms Time into hours.
+
+        Args:
+            df (pd.DataFrame): Credit card dataframe with Time, V1-V28, Amount, Class
+            preserve_pca (bool): Keep all PCA features V1-V28 (default: True, recommended)
+            scale_features (bool): Apply StandardScaler to numerical features (default: False)
+
+        Returns:
+            pd.DataFrame: Dataframe with:
+                - V1-V28 (28 PCA features, preserved)
+                - Amount (transaction amount)
+                - hours (derived from Time)
+                - Class (target, if present)
+
+        Raises:
+            ValueError: If required columns are missing
+
+        Example:
+            >>> fe = FeatureEngineer()
+            >>> cc_data = loader.load_creditcard_data()
+            >>> cc_engineered = fe.engineer_creditcard_features(cc_data)
+            >>> print(cc_engineered.shape)  # Should have 30 features + Class
+            >>> assert all(f'V{i}' in cc_engineered.columns for i in range(1, 29))
+        """
+        df = df.copy()
+
+        # Validate input
+        if "Time" not in df.columns:
+            raise ValueError("'Time' column is required")
+
+        # Check for PCA features V1-V28
+        pca_features = [f"V{i}" for i in range(1, 29)]
+        missing_pca = [f for f in pca_features if f not in df.columns]
+
+        if preserve_pca and missing_pca:
+            raise ValueError(
+                f"Missing PCA features: {missing_pca}. "
+                "Set preserve_pca=False if intentional."
+            )
+
+        # Convert Time (seconds) to hours
+        df["hours"] = (df["Time"] / 3600).astype(float)
+
+        # Select features to keep
+        features_to_keep = []
+
+        # Always keep PCA features if they exist and preserve_pca is True
+        if preserve_pca:
+            features_to_keep.extend([f for f in pca_features if f in df.columns])
+
+        # Add Amount and hours
+        if "Amount" in df.columns:
+            features_to_keep.append("Amount")
+        features_to_keep.append("hours")
+
+        # Add target if present
+        if "Class" in df.columns:
+            features_to_keep.append("Class")
+
+        # Create final dataframe
+        df_final = df[features_to_keep].copy()
+
+        # Optional scaling (not applied by default to avoid data leakage)
+        if scale_features:
+            numerical_cols = [c for c in features_to_keep if c != "Class"]
+            scaler = StandardScaler()
+            df_final[numerical_cols] = scaler.fit_transform(df_final[numerical_cols])
+
+        # Validation: Ensure we have the expected number of features
+        expected_feature_count = 30  # V1-V28 (28) + Amount (1) + hours (1)
+        actual_feature_count = len(df_final.columns) - (
+            1 if "Class" in df_final.columns else 0
+        )
+
+        if actual_feature_count != expected_feature_count:
+            print(
+                f"⚠️  Warning: Expected {expected_feature_count} features, "
+                f"got {actual_feature_count}"
+            )
+
+        print(f"✓ Credit card features engineered: {df_final.shape}")
+        print(f"  Features: {actual_feature_count}")
+        print(
+            f"  PCA features (V1-V28): {sum(1 for c in df_final.columns if c.startswith('V'))}"
+        )
+        print(f"  Target included: {'Class' in df_final.columns}")
+
+        return df_final
