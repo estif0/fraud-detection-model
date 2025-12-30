@@ -33,4 +33,5 @@ pytest-cov
 # Linting
 flake8
 black
+black[jupyter]
 isort
