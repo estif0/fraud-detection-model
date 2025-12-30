@@ -194,9 +194,22 @@ class ExplainabilityAnalyzer:
         print("Initializing SHAP explainer...")
 
         # Use TreeExplainer for tree-based models (much faster)
-        if isinstance(
-            self.model, (RandomForestClassifier, LGBMClassifier, XGBClassifier)
-        ):
+        if isinstance(self.model, XGBClassifier):
+            # For XGBoost, use KernelExplainer with a wrapper function
+            # Sample background data for efficiency
+            background = shap.sample(
+                self.X_test, min(background_samples, len(self.X_test))
+            )
+
+            # Create a wrapper function that doesn't have feature_names_in_
+            def model_predict(X):
+                return self.model.predict_proba(X)
+
+            self.explainer = shap.KernelExplainer(model_predict, background)
+            print(
+                f"✓ KernelExplainer initialized for XGBoost with {len(background)} background samples"
+            )
+        elif isinstance(self.model, (RandomForestClassifier, LGBMClassifier)):
             self.explainer = shap.TreeExplainer(self.model)
             print("✓ TreeExplainer initialized (fast)")
         else:
@@ -393,16 +406,22 @@ class ExplainabilityAnalyzer:
         )
 
         # Create Explanation object
+        # Handle expected_value for binary classification (could be array or scalar)
+        expected_val = 0
+        if hasattr(self.explainer, "expected_value"):
+            if isinstance(self.explainer.expected_value, (list, np.ndarray)):
+                # For binary classification, use positive class expected value
+                expected_val = (
+                    self.explainer.expected_value[-1]
+                    if len(self.explainer.expected_value) > 1
+                    else self.explainer.expected_value[0]
+                )
+            else:
+                expected_val = self.explainer.expected_value
+
         explanation = shap.Explanation(
             values=self.shap_values,
-            base_values=np.full(
-                len(self.shap_values),
-                (
-                    self.explainer.expected_value
-                    if hasattr(self.explainer, "expected_value")
-                    else 0
-                ),
-            ),
+            base_values=np.full(len(self.shap_values), expected_val),
             data=X_analyze.values,
             feature_names=self.feature_names,
         )
