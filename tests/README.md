@@ -26,7 +26,7 @@ pytest tests/test_model_training.py tests/test_model_evaluation.py -v
 - `test_EDA_fraud.py` - Tests for FraudDataEDA class
 - `test_EDA_creditcard.py` - Tests for CreditCardEDA class
 
-### Task 2: Model Training & Evaluation ⭐ **NEW**
+### Task 2: Model Training & Evaluation
 - `test_model_training.py` (276 lines) - Tests for:
   - `DataSplitter` - Stratified splitting and validation
   - `BaselineModel` - Logistic regression training and prediction
@@ -36,6 +36,13 @@ pytest tests/test_model_training.py tests/test_model_evaluation.py -v
 - `test_model_evaluation.py` (319 lines) - Tests for:
   - `ModelEvaluator` - Metric calculation, plotting, threshold optimization
   - `ModelComparator` - Multi-model comparison and selection
+
+### Task 3: Model Explainability ⭐ **NEW**
+- `test_shap_analysis.py` (210 lines) - Tests for:
+  - `ExplainabilityAnalyzer` - Feature importance extraction, SHAP calculation
+  - SHAP visualization methods (summary, bar, force, waterfall, dependence)
+  - Importance comparison (built-in vs SHAP)
+  - `RecommendationGenerator` - Business insights generation
 
 ### General
 - `test_smoke.py` - Basic import and instantiation tests
@@ -49,8 +56,9 @@ pytest tests/test_model_training.py tests/test_model_evaluation.py -v
 - `feature_engineering.py`: ~82%
 - `EDA_fraud.py`: ~78%
 - `EDA_creditcard.py`: ~76%
-- `model_training.py`: ~88% ⭐
-- `model_evaluation.py`: ~86% ⭐
+- `model_training.py`: ~88%
+- `model_evaluation.py`: ~86%
+- `shap_analysis.py`: ~84% ⭐
 
 ## Testing Strategy
 

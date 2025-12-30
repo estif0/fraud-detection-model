@@ -49,8 +49,45 @@ Options:
 - --categoricals: list of categorical columns to encode (default: browser source sex)
 - --scaler: standard or minmax
 
+## run_shap_analysis.py ⭐ **Task 3**
+
+- Purpose: Run SHAP explainability analysis on trained model and generate business insights.
+- Input: Trained model (PKL file) and test data (CSV)
+
+Usage:
+
+```bash
+# Run full SHAP analysis
+python scripts/run_shap_analysis.py \
+  --model models/best_model_xgboost_tuned.pkl \
+  --test-data data/processed/cc_test_scaled_full.csv \
+  --output-dir reports/images \
+  --sample-size 1000
+
+# Generate only global analysis
+python scripts/run_shap_analysis.py \
+  --model models/best_model_xgboost_tuned.pkl \
+  --test-data data/processed/cc_test_scaled_full.csv \
+  --analysis-type global
+
+# Explain specific predictions
+python scripts/run_shap_analysis.py \
+  --model models/best_model_xgboost_tuned.pkl \
+  --test-data data/processed/cc_test_scaled_full.csv \
+  --explain-indices 100 250 500
+```
+
+Options:
+- --sample-size: Number of samples for SHAP calculation (default: 1000)
+- --analysis-type: global, local, or both (default: both)
+- --explain-indices: Specific row indices to explain
+- --top-features: Number of top features to visualize (default: 15)
+- --generate-report: Generate business insights report (default: True)
+
 ## Notes
 
 - Scripts import modular code from src/ and follow OOP architecture.
 - Ensure raw data files exist under data/raw/ before running.
 - Outputs are saved under data/processed/ by default.
+- SHAP visualizations saved to reports/images/ directory.
+- Business insights report saved to reports/BUSINESS_INSIGHTS_REPORT.md
