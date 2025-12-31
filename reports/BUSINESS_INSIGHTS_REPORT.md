@@ -8,35 +8,35 @@ Based on SHAP explainability analysis, we have identified the key drivers of fra
 
 The following features have the strongest impact on fraud prediction:
 
-### 1. V14 (Importance: 18.2%)
+### 1. V14 (Importance: 18.8%)
 
 **Insight:** V14 shows strong predictive power for fraud detection. This PCA feature captures critical transaction patterns.
 
 **Recommended Action:** Implement real-time monitoring of V14 values. Flag transactions with V14 values outside normal ranges for enhanced review.
 
-### 2. V4 (Importance: 11.9%)
+### 2. V4 (Importance: 12.0%)
 
 **Insight:** V4 shows consistent fraud signal strength across different transaction types.
 
 **Recommended Action:** Incorporate V4 into multi-factor authentication triggers. High-risk V4 values should prompt additional verification.
 
-### 3. V12 (Importance: 9.4%)
+### 3. V12 (Importance: 8.3%)
 
 **Insight:** V12 reveals important fraud indicators in transaction data.
 
 **Recommended Action:** Use V12 as a primary feature in fraud risk models. Implement automated blocking for extreme V12 values.
 
-### 4. V1 (Importance: 7.8%)
+### 4. V3 (Importance: 7.4%)
 
-**Insight:** V1 is a significant fraud predictor (importance: 7.8%).
-
-**Recommended Action:** Monitor V1 values closely. Establish baseline patterns and flag deviations for investigation.
-
-### 5. V3 (Importance: 6.9%)
-
-**Insight:** V3 is a significant fraud predictor (importance: 6.9%).
+**Insight:** V3 is a significant fraud predictor (importance: 7.4%).
 
 **Recommended Action:** Monitor V3 values closely. Establish baseline patterns and flag deviations for investigation.
+
+### 5. V1 (Importance: 6.5%)
+
+**Insight:** V1 is a significant fraud predictor (importance: 6.5%).
+
+**Recommended Action:** Monitor V1 values closely. Establish baseline patterns and flag deviations for investigation.
 
 ## Strategic Recommendations
 
